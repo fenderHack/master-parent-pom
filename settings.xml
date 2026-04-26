@@ -4,7 +4,7 @@
 ║                    MAVEN SETTINGS.XML (Credentials & Repos)                    ║
 ╠════════════════════════════════════════════════════════════════════════════════╣
 ║ THIS FILE STORES SENSITIVE CREDENTIALS - NEVER COMMIT TO GIT!                ║
-║                                                                                ║
+║                                                                               ║
 ║ PURPOSE:                                                                      ║
 ║   Provides authentication for:                                               ║
 ║   • Anypoint Platform (CloudHub login)                                       ║
