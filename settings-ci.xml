@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+    <!--
+        Fichier settings Maven pour la CI/CD — aucun secret en dur.
+        Les credentials sont injectés depuis les secrets GitHub (ANYPOINT_CLIENT_ID, ANYPOINT_CLIENT_SECRET).
+
+        Format Connected App MuleSoft :
+          username : ~~~Client~~~
+          password : <clientId>~<clientSecret>
+    -->
+    <servers>
+
+        <!-- Authentification pour publier sur Anypoint Exchange -->
+        <server>
+            <id>anypoint-exchange-v3</id>
+            <username>~~~Client~~~</username>
+            <password>${env.ANYPOINT_CLIENT_ID}~${env.ANYPOINT_CLIENT_SECRET}</password>
+        </server>
+
+        <!-- Repo MuleSoft EE (nécessaire pour télécharger mule-maven-plugin) -->
+        <server>
+            <id>mulesoft-ee-releases</id>
+            <username>~~~Client~~~</username>
+            <password>${env.ANYPOINT_CLIENT_ID}~${env.ANYPOINT_CLIENT_SECRET}</password>
+        </server>
+
+    </servers>
+
+</settings>

@@ -523,4 +523,13 @@
 		</resources>
 	</build>
 
+	<distributionManagement>
+		<repository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange — Org Repository</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/organizations/19f95d7d-3947-427e-bb08-a9810ebfd7e0/maven</url>
+			<layout>default</layout>
+		</repository>
+	</distributionManagement>
+
 </project>
