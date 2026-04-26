@@ -1,8 +1,5 @@
 name: Publish to Anypoint Exchange
 
-# Exchange v3 Maven facade retourne 412 pour les POM "custom" car il ne peut pas
-# déterminer le type d'asset. On utilise l'API REST Exchange v2 directement.
-
 on:
   push:
     branches: [ "master" ]
@@ -29,17 +26,17 @@ jobs:
           java-version: "8"
           distribution: "temurin"
 
-      # ── 1. Authentification Anypoint Platform ───────────────────────────────
+      # ── 1. Authentification ─────────────────────────────────────────────────
       - name: Get Anypoint access token
         id: auth
         run: |
-          TOKEN=$(curl -sf -X POST \
+          RESPONSE=$(curl -sf -X POST \
             "${ANYPOINT_URL}/accounts/login" \
             -H "Content-Type: application/json" \
-            -d '{"username":"'"$ANYPOINT_USERNAME"'","password":"'"$ANYPOINT_PASSWORD"'"}' \
-            | jq -r '.access_token')
+            -d '{"username":"'"$ANYPOINT_USERNAME"'","password":"'"$ANYPOINT_PASSWORD"'"}')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
           if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then
-            echo "Authentication failed"
+            echo "Authentication failed: $RESPONSE"
             exit 1
           fi
           echo "::add-mask::$TOKEN"
@@ -48,55 +45,48 @@ jobs:
           ANYPOINT_USERNAME: ${{ secrets.ANYPOINT_USERNAME }}
           ANYPOINT_PASSWORD: ${{ secrets.ANYPOINT_PASSWORD }}
 
-      # ── 2. master-bom en local .m2 (requis pour résoudre parent-pom) ────────
+      # ── 2. Installer master-bom en local (requis pour résoudre parent-pom) ──
       - name: Install master-bom to local .m2
         run: mvn install -f master-bom/pom.xml -q --no-transfer-progress
 
-      # ── 3. Publier master-bom via Exchange REST API ─────────────────────────
+      # ── 3. Publier master-bom ────────────────────────────────────────────────
+      # URL format: /organizations/{orgId}/assets/{groupId}/{assetId}/{version}
       - name: Publish master-bom
         run: |
           VERSION=$(mvn help:evaluate -f master-bom/pom.xml \
             -Dexpression=project.version -q -DforceStdout)
-          echo "→ master-bom v${VERSION}"
+          echo "Publishing master-bom v${VERSION}"
 
           HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
-            "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets" \
+            "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/master-bom/${VERSION}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -F "organizationId=${ORG_ID}" \
-            -F "groupId=${ORG_ID}" \
-            -F "assetId=master-bom" \
-            -F "version=${VERSION}" \
             -F "name=Master BOM" \
-            -F "description=Master BOM - Gestion centralisée des versions MuleSoft" \
+            -F "description=Master BOM - Gestion centralisee des versions MuleSoft" \
             -F "type=custom" \
-            -F "files.pom=@master-bom/pom.xml;type=application/xml")
+            -F "files[pom]=@master-bom/pom.xml;type=application/xml;filename=pom.xml")
 
           cat /tmp/resp.txt && echo ""
           echo "HTTP ${HTTP_CODE}"
-          # 201 = créé, 409 = version déjà existante (non bloquant)
+          # 201 = créé, 409 = version déjà publiée (non bloquant)
           [[ "${HTTP_CODE}" == "201" || "${HTTP_CODE}" == "409" ]] || \
-            { echo "Echec publication master-bom"; exit 1; }
+            { echo "Echec publication master-bom (HTTP ${HTTP_CODE})"; exit 1; }
 
-      # ── 4. Publier parent-pom via Exchange REST API ─────────────────────────
+      # ── 4. Publier parent-pom ────────────────────────────────────────────────
       - name: Publish parent-pom
         run: |
           VERSION=$(mvn help:evaluate -f parent-pom/pom.xml \
             -Dexpression=project.version -q -DforceStdout)
-          echo "→ parent-pom v${VERSION}"
+          echo "Publishing parent-pom v${VERSION}"
 
           HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
-            "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets" \
+            "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/parent-pom/${VERSION}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -F "organizationId=${ORG_ID}" \
-            -F "groupId=${ORG_ID}" \
-            -F "assetId=parent-pom" \
-            -F "version=${VERSION}" \
             -F "name=Parent POM" \
-            -F "description=Parent POM - Configuration build et déploiement CloudHub 2.0" \
+            -F "description=Parent POM - Configuration build et deploiement CloudHub 2.0" \
             -F "type=custom" \
-            -F "files.pom=@parent-pom/pom.xml;type=application/xml")
+            -F "files[pom]=@parent-pom/pom.xml;type=application/xml;filename=pom.xml")
 
           cat /tmp/resp.txt && echo ""
           echo "HTTP ${HTTP_CODE}"
           [[ "${HTTP_CODE}" == "201" || "${HTTP_CODE}" == "409" ]] || \
-            { echo "Echec publication parent-pom"; exit 1; }
+            { echo "Echec publication parent-pom (HTTP ${HTTP_CODE})"; exit 1; }
