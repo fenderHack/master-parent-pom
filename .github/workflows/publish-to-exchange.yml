@@ -63,7 +63,7 @@ jobs:
             -F "name=Master BOM" \
             -F "description=Master BOM - Gestion centralisee des versions MuleSoft" \
             -F "type=custom" \
-            -F "files[pom]=@master-bom/pom.xml;type=application/xml;filename=pom.xml")
+            -F "files.pom.pom=@master-bom/pom.xml;type=application/xml;filename=pom.xml")
 
           cat /tmp/resp.txt && echo ""
           echo "HTTP ${HTTP_CODE}"
@@ -84,7 +84,7 @@ jobs:
             -F "name=Parent POM" \
             -F "description=Parent POM - Configuration build et deploiement CloudHub 2.0" \
             -F "type=custom" \
-            -F "files[pom]=@parent-pom/pom.xml;type=application/xml;filename=pom.xml")
+            -F "files.pom.pom=@parent-pom/pom.xml;type=application/xml;filename=pom.xml")
 
           cat /tmp/resp.txt && echo ""
           echo "HTTP ${HTTP_CODE}"
