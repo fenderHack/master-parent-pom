@@ -51,13 +51,25 @@ jobs:
         run: |
           VERSION=$(mvn help:evaluate -f master-bom/pom.xml \
             -Dexpression=project.version -q -DforceStdout)
-          echo "Publishing master-bom v${VERSION}"
+          ASSET_NAME=$(mvn help:evaluate -f master-bom/pom.xml \
+            -Dexpression=project.name -q -DforceStdout)
+          ASSET_DESCRIPTION=$(mvn help:evaluate -f master-bom/pom.xml \
+            -Dexpression=project.description -q -DforceStdout)
+          ASSET_TYPE=$(mvn help:evaluate -f master-bom/pom.xml \
+            -Dexpression=project.properties.type -q -DforceStdout)
+          if [[ -z "${ASSET_TYPE}" || "${ASSET_TYPE}" == "null" ]]; then
+            ASSET_TYPE="custom"
+          fi
+          echo "Publishing ${ASSET_NAME} v${VERSION} (type=${ASSET_TYPE})"
 
           RESP_FILE=/tmp/master-bom-resp.txt
           STATUS_FILE=/tmp/master-bom-status.txt
           HTTP_CODE=$(curl -s -o "${RESP_FILE}" -w "%{http_code}" -X POST \
             "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/master-bom/${VERSION}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -F "name=${ASSET_NAME}" \
+            -F "description=${ASSET_DESCRIPTION}" \
+            -F "type=${ASSET_TYPE}" \
             -F "files.pom.pom=@master-bom/pom.xml;type=application/xml;filename=pom.xml")
 
           cat "${RESP_FILE}" && echo ""
@@ -105,13 +117,25 @@ jobs:
         run: |
           VERSION=$(mvn help:evaluate -f parent-pom/pom.xml \
             -Dexpression=project.version -q -DforceStdout)
-          echo "Publishing parent-pom v${VERSION}"
+          ASSET_NAME=$(mvn help:evaluate -f parent-pom/pom.xml \
+            -Dexpression=project.name -q -DforceStdout)
+          ASSET_DESCRIPTION=$(mvn help:evaluate -f parent-pom/pom.xml \
+            -Dexpression=project.description -q -DforceStdout)
+          ASSET_TYPE=$(mvn help:evaluate -f parent-pom/pom.xml \
+            -Dexpression=project.properties.type -q -DforceStdout)
+          if [[ -z "${ASSET_TYPE}" || "${ASSET_TYPE}" == "null" ]]; then
+            ASSET_TYPE="custom"
+          fi
+          echo "Publishing ${ASSET_NAME} v${VERSION} (type=${ASSET_TYPE})"
 
           RESP_FILE=/tmp/parent-pom-resp.txt
           STATUS_FILE=/tmp/parent-pom-status.txt
           HTTP_CODE=$(curl -s -o "${RESP_FILE}" -w "%{http_code}" -X POST \
             "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/parent-pom/${VERSION}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -F "name=${ASSET_NAME}" \
+            -F "description=${ASSET_DESCRIPTION}" \
+            -F "type=${ASSET_TYPE}" \
             -F "files.pom.pom=@parent-pom/pom.xml;type=application/xml;filename=pom.xml")
 
           cat "${RESP_FILE}" && echo ""
