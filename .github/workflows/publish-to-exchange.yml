@@ -57,12 +57,10 @@ jobs:
             -Dexpression=project.version -q -DforceStdout)
           echo "Publishing master-bom v${VERSION}"
 
+          # Exchange lit name/description/type directement depuis le POM — ne pas les redéclarer
           HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
             "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/master-bom/${VERSION}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -F "name=Master BOM" \
-            -F "description=Master BOM - Gestion centralisee des versions MuleSoft" \
-            -F "type=custom" \
             -F "files.pom.pom=@master-bom/pom.xml;type=application/xml;filename=pom.xml")
 
           cat /tmp/resp.txt && echo ""
@@ -78,12 +76,10 @@ jobs:
             -Dexpression=project.version -q -DforceStdout)
           echo "Publishing parent-pom v${VERSION}"
 
+          # Exchange lit name/description/type directement depuis le POM — ne pas les redéclarer
           HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
             "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/parent-pom/${VERSION}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -F "name=Parent POM" \
-            -F "description=Parent POM - Configuration build et deploiement CloudHub 2.0" \
-            -F "type=custom" \
             -F "files.pom.pom=@parent-pom/pom.xml;type=application/xml;filename=pom.xml")
 
           cat /tmp/resp.txt && echo ""
