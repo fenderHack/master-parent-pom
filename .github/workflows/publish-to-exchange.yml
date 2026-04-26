@@ -8,10 +8,6 @@ on:
       - "parent-pom/pom.xml"
   workflow_dispatch:
 
-env:
-  ORG_ID: "19f95d7d-3947-427e-bb08-a9810ebfd7e0"
-  ANYPOINT_URL: "https://anypoint.mulesoft.com"
-
 jobs:
   publish:
     name: Publish BOM & Parent POM
@@ -26,155 +22,54 @@ jobs:
           java-version: "8"
           distribution: "temurin"
 
-      - name: Get Anypoint access token
-        id: auth
-        run: |
-          RESPONSE=$(curl -sf -X POST \
-            "${ANYPOINT_URL}/accounts/login" \
-            -H "Content-Type: application/json" \
-            -d '{"username":"'"$ANYPOINT_USERNAME"'","password":"'"$ANYPOINT_PASSWORD"'"}')
-          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
-          if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then
-            echo "Authentication failed: $RESPONSE"
-            exit 1
-          fi
-          echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+      - name: Install master-bom to local .m2
+        run: mvn install -f master-bom/pom.xml -s settings-ci.xml -ntp
         env:
           ANYPOINT_USERNAME: ${{ secrets.ANYPOINT_USERNAME }}
           ANYPOINT_PASSWORD: ${{ secrets.ANYPOINT_PASSWORD }}
-
-      - name: Install master-bom to local .m2
-        run: mvn install -f master-bom/pom.xml -q --no-transfer-progress
 
       - name: Publish master-bom
         run: |
           VERSION=$(mvn help:evaluate -f master-bom/pom.xml \
             -Dexpression=project.version -q -DforceStdout)
-          ASSET_NAME=$(mvn help:evaluate -f master-bom/pom.xml \
-            -Dexpression=project.name -q -DforceStdout)
-          ASSET_DESCRIPTION=$(mvn help:evaluate -f master-bom/pom.xml \
-            -Dexpression=project.description -q -DforceStdout)
-          ASSET_TYPE=$(mvn help:evaluate -f master-bom/pom.xml \
-            -Dexpression=project.properties.type -q -DforceStdout)
-          if [[ -z "${ASSET_TYPE}" || "${ASSET_TYPE}" == "null" ]]; then
-            ASSET_TYPE="custom"
-          fi
-          echo "Publishing ${ASSET_NAME} v${VERSION} (type=${ASSET_TYPE})"
+          echo "Publishing master-bom v${VERSION} via Maven deploy"
 
-          RESP_FILE=/tmp/master-bom-resp.txt
-          STATUS_FILE=/tmp/master-bom-status.txt
-          HTTP_CODE=$(curl -s -o "${RESP_FILE}" -w "%{http_code}" -X POST \
-            "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/master-bom/${VERSION}" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -F "name=${ASSET_NAME}" \
-            -F "description=${ASSET_DESCRIPTION}" \
-            -F "type=${ASSET_TYPE}" \
-            -F "files.pom.pom=@master-bom/pom.xml;type=application/xml;filename=pom.xml")
-
-          cat "${RESP_FILE}" && echo ""
-          echo "HTTP ${HTTP_CODE}"
-
-          if [[ "${HTTP_CODE}" == "202" ]]; then
-            STATUS_URL=$(jq -r '.publicationStatusLink // empty' "${RESP_FILE}")
-            if [[ -z "${STATUS_URL}" ]]; then
-              echo "master-bom accepted (202) but publicationStatusLink is missing"
+          LOG_FILE=/tmp/master-bom-deploy.log
+          if mvn deploy -f master-bom/pom.xml -s settings-ci.xml -ntp >"${LOG_FILE}" 2>&1; then
+            cat "${LOG_FILE}"
+            echo "master-bom published."
+          else
+            cat "${LOG_FILE}"
+            if grep -Eiq "status code: 409|409 Conflict|already exists|already been deployed" "${LOG_FILE}"; then
+              echo "master-bom already published (409) - continuing."
+            else
+              echo "Echec publication master-bom via Maven deploy"
               exit 1
             fi
-
-            echo "master-bom accepted; polling publication status..."
-            for ATTEMPT in {1..30}; do
-              STATUS_HTTP=$(curl -s -o "${STATUS_FILE}" -w "%{http_code}" \
-                -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-                "${STATUS_URL}")
-              STATUS_VALUE=$(jq -r '.status // .publicationStatus // .state // empty' "${STATUS_FILE}" | tr '[:upper:]' '[:lower:]')
-              echo "poll ${ATTEMPT}/30 => HTTP ${STATUS_HTTP}, status=${STATUS_VALUE:-unknown}"
-
-              if [[ "${STATUS_HTTP}" == "200" ]]; then
-                if [[ "${STATUS_VALUE}" =~ ^(published|completed|success|succeeded|done)$ ]]; then
-                  HTTP_CODE="201"
-                  echo "master-bom publication completed."
-                  break
-                fi
-
-                if [[ "${STATUS_VALUE}" =~ ^(failed|error|errored|rejected|canceled|cancelled)$ ]]; then
-                  echo "master-bom publication failed:"
-                  cat "${STATUS_FILE}"
-                  exit 1
-                fi
-              fi
-
-              sleep 10
-            done
-
-            [[ "${HTTP_CODE}" == "201" ]] || { echo "Timed out waiting for master-bom publication"; exit 1; }
           fi
-
-          [[ "${HTTP_CODE}" == "201" || "${HTTP_CODE}" == "409" ]] || \
-            { echo "Echec publication master-bom (HTTP ${HTTP_CODE})"; exit 1; }
+        env:
+          ANYPOINT_USERNAME: ${{ secrets.ANYPOINT_USERNAME }}
+          ANYPOINT_PASSWORD: ${{ secrets.ANYPOINT_PASSWORD }}
 
       - name: Publish parent-pom
         run: |
           VERSION=$(mvn help:evaluate -f parent-pom/pom.xml \
             -Dexpression=project.version -q -DforceStdout)
-          ASSET_NAME=$(mvn help:evaluate -f parent-pom/pom.xml \
-            -Dexpression=project.name -q -DforceStdout)
-          ASSET_DESCRIPTION=$(mvn help:evaluate -f parent-pom/pom.xml \
-            -Dexpression=project.description -q -DforceStdout)
-          ASSET_TYPE=$(mvn help:evaluate -f parent-pom/pom.xml \
-            -Dexpression=project.properties.type -q -DforceStdout)
-          if [[ -z "${ASSET_TYPE}" || "${ASSET_TYPE}" == "null" ]]; then
-            ASSET_TYPE="custom"
-          fi
-          echo "Publishing ${ASSET_NAME} v${VERSION} (type=${ASSET_TYPE})"
+          echo "Publishing parent-pom v${VERSION} via Maven deploy"
 
-          RESP_FILE=/tmp/parent-pom-resp.txt
-          STATUS_FILE=/tmp/parent-pom-status.txt
-          HTTP_CODE=$(curl -s -o "${RESP_FILE}" -w "%{http_code}" -X POST \
-            "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/parent-pom/${VERSION}" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -F "name=${ASSET_NAME}" \
-            -F "description=${ASSET_DESCRIPTION}" \
-            -F "type=${ASSET_TYPE}" \
-            -F "files.pom.pom=@parent-pom/pom.xml;type=application/xml;filename=pom.xml")
-
-          cat "${RESP_FILE}" && echo ""
-          echo "HTTP ${HTTP_CODE}"
-
-          if [[ "${HTTP_CODE}" == "202" ]]; then
-            STATUS_URL=$(jq -r '.publicationStatusLink // empty' "${RESP_FILE}")
-            if [[ -z "${STATUS_URL}" ]]; then
-              echo "parent-pom accepted (202) but publicationStatusLink is missing"
+          LOG_FILE=/tmp/parent-pom-deploy.log
+          if mvn deploy -f parent-pom/pom.xml -s settings-ci.xml -ntp >"${LOG_FILE}" 2>&1; then
+            cat "${LOG_FILE}"
+            echo "parent-pom published."
+          else
+            cat "${LOG_FILE}"
+            if grep -Eiq "status code: 409|409 Conflict|already exists|already been deployed" "${LOG_FILE}"; then
+              echo "parent-pom already published (409) - continuing."
+            else
+              echo "Echec publication parent-pom via Maven deploy"
               exit 1
             fi
-
-            echo "parent-pom accepted; polling publication status..."
-            for ATTEMPT in {1..30}; do
-              STATUS_HTTP=$(curl -s -o "${STATUS_FILE}" -w "%{http_code}" \
-                -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-                "${STATUS_URL}")
-              STATUS_VALUE=$(jq -r '.status // .publicationStatus // .state // empty' "${STATUS_FILE}" | tr '[:upper:]' '[:lower:]')
-              echo "poll ${ATTEMPT}/30 => HTTP ${STATUS_HTTP}, status=${STATUS_VALUE:-unknown}"
-
-              if [[ "${STATUS_HTTP}" == "200" ]]; then
-                if [[ "${STATUS_VALUE}" =~ ^(published|completed|success|succeeded|done)$ ]]; then
-                  HTTP_CODE="201"
-                  echo "parent-pom publication completed."
-                  break
-                fi
-
-                if [[ "${STATUS_VALUE}" =~ ^(failed|error|errored|rejected|canceled|cancelled)$ ]]; then
-                  echo "parent-pom publication failed:"
-                  cat "${STATUS_FILE}"
-                  exit 1
-                fi
-              fi
-
-              sleep 10
-            done
-
-            [[ "${HTTP_CODE}" == "201" ]] || { echo "Timed out waiting for parent-pom publication"; exit 1; }
           fi
-
-          [[ "${HTTP_CODE}" == "201" || "${HTTP_CODE}" == "409" ]] || \
-            { echo "Echec publication parent-pom (HTTP ${HTTP_CODE})"; exit 1; }
+        env:
+          ANYPOINT_USERNAME: ${{ secrets.ANYPOINT_USERNAME }}
+          ANYPOINT_PASSWORD: ${{ secrets.ANYPOINT_PASSWORD }}
