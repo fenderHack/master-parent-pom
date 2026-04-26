@@ -31,11 +31,10 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # ── master-bom doit être déployé EN PREMIER ─────────────────────────────
-      # mvn deploy inclut la phase install → master-bom sera dans le .m2 local
-      # pour que parent-pom puisse résoudre son parent sans dépendre d'Exchange.
-
+      # Exchange v3 n'est pas compatible avec maven-deploy-plugin 3.x (erreur 412).
+      # On force la version 2.8.2 via propriété système en plus du pluginManagement.
       - name: Deploy master-bom to Exchange
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
           ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
@@ -43,13 +42,23 @@ jobs:
           mvn deploy \
             -f master-bom/pom.xml \
             -s settings-ci.xml \
-            ${{ github.event.inputs.dry_run == 'true' && '-DskipRemoteStaging' || '' }} \
+            -Dmaven.deploy.plugin.version=2.8.2 \
             --no-transfer-progress
 
-      # ── parent-pom ──────────────────────────────────────────────────────────
-      # Résout master-bom depuis le .m2 local (installé à l'étape précédente).
+      - name: Install master-bom locally (dry run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        env:
+          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
+          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+        run: |
+          mvn install \
+            -f master-bom/pom.xml \
+            -s settings-ci.xml \
+            --no-transfer-progress
 
+      # master-bom est dans le .m2 local après l'étape précédente.
       - name: Deploy parent-pom to Exchange
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
           ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
@@ -57,5 +66,16 @@ jobs:
           mvn deploy \
             -f parent-pom/pom.xml \
             -s settings-ci.xml \
-            ${{ github.event.inputs.dry_run == 'true' && '-DskipRemoteStaging' || '' }} \
+            -Dmaven.deploy.plugin.version=2.8.2 \
+            --no-transfer-progress
+
+      - name: Install parent-pom locally (dry run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        env:
+          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
+          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+        run: |
+          mvn install \
+            -f parent-pom/pom.xml \
+            -s settings-ci.xml \
             --no-transfer-progress
