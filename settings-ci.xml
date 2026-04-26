@@ -17,15 +17,15 @@
         <!-- Authentification pour publier sur Anypoint Exchange -->
         <server>
             <id>anypoint-exchange-v3</id>
-            <username>~~~Client~~~</username>
-            <password>${env.ANYPOINT_CLIENT_ID}~${env.ANYPOINT_CLIENT_SECRET}</password>
+            <username>Fender26c</username>
+            <password>41062406Aa@</password>
         </server>
 
         <!-- Repo MuleSoft EE (nécessaire pour télécharger mule-maven-plugin) -->
         <server>
             <id>mulesoft-ee-releases</id>
-            <username>~~~Client~~~</username>
-            <password>${env.ANYPOINT_CLIENT_ID}~${env.ANYPOINT_CLIENT_SECRET}</password>
+            <username>Fender26c</username>
+            <password>41062406Aa@</password>
         </server>
 
     </servers>
