@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>19f95d7d-3947-427e-bb08-a9810ebfd7e0</groupId>
+    <artifactId>master-bom</artifactId>
+    <version>2.0.0</version>
+    <packaging>pom</packaging>
+    <name>master-bom</name>
+	<description>Master BOM pour les APIs Mule</description>
+
+    <!--
+    ╔════════════════════════════════════════════════════════════════════════════╗
+    ║                           MASTER BOM (Bill of Materials)                   ║
+    ╠════════════════════════════════════════════════════════════════════════════╣
+    ║ PURPOSE:                                                                   ║
+    ║   This file ONLY manages version numbers. It defines ONE SOURCE OF TRUTH   ║
+    ║   for all dependency & plugin versions in the organization.               ║
+    ║                                                                            ║
+    ║ WHY THIS MATTERS:                                                         ║
+    ║   • Prevents version conflicts (all modules use SAME versions)            ║
+    ║   • Single place to upgrade all dependencies at once                      ║
+    ║   • Easier maintenance and consistency across projects                    ║
+    ║                                                                            ║
+    ║ HIERARCHY (How it all fits together):                                     ║
+    ║   master-bom.pom (versions defined here)                                  ║
+    ║        ↓                                                                   ║
+    ║   parent-pom.pom (inherits versions, adds build/deploy config)           ║
+    ║        ↓                                                                   ║
+    ║   pom.xml (YOUR APP - uses inherited config)                              ║
+    ║                                                                            ║
+    ║ DO NOT ADD HERE:                                                          ║
+    ║   ✗ Build plugins (maven-compiler, maven-surefire, etc)                   ║
+    ║   ✗ Deployment config (CloudHub settings, plugins with <configuration>)  ║
+    ║   ✗ Profiles for deployment                                              ║
+    ║   → Put those in parent-pom.xml instead                                  ║
+    ║                                                                            ║
+    ║ TO UPDATE A DEPENDENCY VERSION:                                           ║
+    ║   Change the property below (e.g., mule.runtime.4.12.0) and ALL apps    ║
+    ║   that inherit from this will use the new version!                        ║
+    ╚════════════════════════════════════════════════════════════════════════════╝
+    -->
+
+    <properties>
+		<type>custom</type>
+        <!-- CHARACTER ENCODING: UTF-8 for all source files and output -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════
+        MULE RUNTIME VERSION
+        ═══════════════════════════════════════════════════════════════════════
+        This is the version of Mule that will run your app in CloudHub.
+        
+        COMMON VERSIONS:
+          • 4.11.0 = Latest stable (October 2025)
+          • 4.10.x = Previous stable (June 2025)
+          • 4.9.x = Older stable (March 2025)
+        
+        To upgrade: Change this version AND test thoroughly!
+        Current: 4.11.0
+        -->
+        <app.runtime>4.11.0</app.runtime>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════
+        MAVEN BUILD PLUGINS
+        ═══════════════════════════════════════════════════════════════════════
+        These are tools that help Maven build your project.
+        
+        • maven-clean-plugin = Deletes the 'target' folder (mvn clean)
+        • maven-resources-plugin = Copies files from src/main/resources
+        • maven-compiler-plugin = Compiles Java code (.java → .class)
+        -->
+        <maven.clean.plugin.version>3.2.0</maven.clean.plugin.version>
+        <maven.resources.plugin.version>3.3.1</maven.resources.plugin.version>
+        <maven.compiler.plugin.version>3.12.1</maven.compiler.plugin.version>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════
+        MULE-SPECIFIC MAVEN PLUGIN
+        ═══════════════════════════════════════════════════════════════════════
+        mule-maven-plugin = Special plugin by MuleSoft that handles:
+          • Packaging Mule flows into a deployable JAR
+          • Deploying apps to CloudHub 2.0
+          • Managing Mule Runtime dependencies
+        
+        This is ESSENTIAL for any Mule application!
+        -->
+        <mule.maven.plugin.version>4.7.0</mule.maven.plugin.version>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════
+        MULE CONNECTORS (Libraries that connect to external systems)
+        ═══════════════════════════════════════════════════════════════════════
+        These are pre-built modules that help your app communicate:
+        
+        • HTTP Connector = Make REST calls, listen for HTTP requests
+        • Sockets Connector = Low-level TCP/UDP network connections
+        • APIKit Module = Build REST APIs with RAML specifications
+        • Secure Config = Decrypt encrypted properties at runtime
+        
+        EXAMPLE: If your app needs to call a REST API, you use HTTP Connector
+        -->
+        <mule.http.connector.version>1.11.1</mule.http.connector.version>
+        <mule.sockets.connector.version>1.2.7</mule.sockets.connector.version>
+        <mule.apikit.module.version>1.11.11</mule.apikit.module.version>
+        <mule.secure.configuration.version>1.2.7</mule.secure.configuration.version>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════
+        MUNIT (Mule Unit Testing Framework)
+        ═══════════════════════════════════════════════════════════════════════
+        Use MUnit to write tests for your Mule flows.
+        
+        • munit-runner = Runs your test cases (like JUnit for Mule)
+        • munit-tools = Utilities for mocking, assertions, etc
+        • munit-assertions = Library for verifying test results
+        
+        EXAMPLE TEST: Verify that a flow transforms JSON correctly
+        -->
+        <munit.version>2.3.17</munit.version>
+        <munit.runner.version>2.3.17</munit.runner.version>
+        <munit.tools.version>2.3.17</munit.tools.version>
+        <munit.assertions.version>1.1.0</munit.assertions.version>
+    </properties>
+
+    <build>
+        <!--  
+		 <pluginManagement> is Maven’s central defaults catalog for plugins.
+			It means:
+			Define plugin version + default config once (usually in parent POM).
+			Child modules don’t run plugins from pluginManagement automatically.
+			Child modules must still declare the plugin in <build><plugins> to activate it.
+			When they do, they inherit version/config from pluginManagement (unless overridden).
+			In your project:
+			Parent defines mule-maven-plugin defaults in parent-pom/pom.xml.
+			App POM activates it in pom.xml with <extensions>true</extensions>.
+		  -->
+
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-clean-plugin</artifactId>
+                    <version>${maven.clean.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${maven.resources.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.mule.tools.maven</groupId>
+                    <artifactId>mule-maven-plugin</artifactId>
+                    <version>${mule.maven.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>com.mulesoft.munit.tools</groupId>
+                    <artifactId>munit-maven-plugin</artifactId>
+                    <version>${munit.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+
+     <!--  
+     
+     <dependencyManagement> is Maven’s version catalog for dependencies.
+
+        It means:
+
+        Central place to define dependency versions (and sometimes scope/exclusions).
+        It does not add dependencies by itself.
+        Child/app POM still must declare dependencies in <dependencies>.
+        When declared without version, Maven uses the managed version automatically.
+        In your project:
+
+        Versions are managed in master-bom/pom.xml.
+        App declares needed dependencies in pom.xml mostly without <version>, so they stay aligned with the BOM.
+      -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- HTTP Connector -->
+            <dependency>
+                <groupId>org.mule.connectors</groupId>
+                <artifactId>mule-http-connector</artifactId>
+                <version>${mule.http.connector.version}</version>
+                <classifier>mule-plugin</classifier>
+            </dependency>
+            <!-- Sockets Connector -->
+            <dependency>
+                <groupId>org.mule.connectors</groupId>
+                <artifactId>mule-sockets-connector</artifactId>
+                <version>${mule.sockets.connector.version}</version>
+                <classifier>mule-plugin</classifier>
+            </dependency>
+            <!-- APIKit Module -->
+            <dependency>
+                <groupId>org.mule.modules</groupId>
+                <artifactId>mule-apikit-module</artifactId>
+                <version>${mule.apikit.module.version}</version>
+                <classifier>mule-plugin</classifier>
+            </dependency>
+            <!-- Secure Configuration Property Module -->
+            <dependency>
+                <groupId>com.mulesoft.modules</groupId>
+                <artifactId>mule-secure-configuration-property-module</artifactId>
+                <version>${mule.secure.configuration.version}</version>
+                <classifier>mule-plugin</classifier>
+            </dependency>
+            <!-- MUnit — test scope only -->
+            <dependency>
+                <groupId>org.mule.weave</groupId>
+                <artifactId>assertions</artifactId>
+                <version>${munit.assertions.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.mulesoft.munit</groupId>
+                <artifactId>munit-runner</artifactId>
+                <version>${munit.runner.version}</version>
+                <classifier>mule-plugin</classifier>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.mulesoft.munit</groupId>
+                <artifactId>munit-tools</artifactId>
+                <version>${munit.tools.version}</version>
+                <classifier>mule-plugin</classifier>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!--
+        Repository IDs must match server IDs in settings.xml:
+          anypoint-exchange-v3 → username/password (Fender26c) for artifact download
+          clientAPP            → Connected App (~~~Client~~~) for Exchange publish
+          mulesoft-releases    → public, no auth required
+    -->
+    <!-- 
+        Think of it as:
+
+        repositories = where Maven downloads dependencies from
+        distributionManagement = where Maven uploads your built artifact (jar, pom) on mvn deploy
+        In your project, master-bom/pom.xml (line 276) points to your org’s Anypoint Exchange Maven endpoint, so mvn deploy publishes there.
+
+        Important details:
+
+        The <id> in distributionManagement must match a <server><id>... in settings.xml (line 140) for auth.
+        mvn package builds only (no remote publish).
+        mvn install publishes only to local .m2.
+        mvn deploy publishes to the remote repo defined in distributionManagement.
+       -->
+    <repositories>
+        <repository>
+            <id>anypoint-exchange-v3</id>
+            <name>Anypoint Exchange v3</name>
+            <url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+            <layout>default</layout>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>mulesoft-releases</id>
+            <name>MuleSoft Releases Repository</name>
+            <url>https://repository.mulesoft.org/releases/</url>
+            <layout>default</layout>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>mulesoft-ee-releases</id>
+            <name>MuleSoft EE Releases Repository</name>
+            <url>https://repository.mulesoft.org/nexus-ee/content/repositories/releases-ee/</url>
+            <layout>default</layout>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+     <!-- 
+     
+            <pluginRepositories> is where Maven looks to download build plugins (not normal app dependencies).
+
+            Quick map:
+
+            <repositories>: for project dependencies (<dependencies>)
+            <pluginRepositories>: for build plugins (<build><plugins>, like mule-maven-plugin)
+            In your setup, this is why Maven can fetch Mule plugins from MuleSoft’s repo 
+            (for example in master-bom/pom.xml).
+       -->
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>mulesoft-releases</id>
+            <name>MuleSoft Releases Repository</name>
+            <url>https://repository.mulesoft.org/releases/</url>
+            <layout>default</layout>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
+
+
+     <!-- 
+     <distributionManagement> in Maven is the publish destination for your project artifact.
+
+        Think of it as:
+
+        repositories = where Maven downloads dependencies from
+        distributionManagement = where Maven uploads your built artifact (jar, pom) on mvn deploy
+        In your project, master-bom/pom.xml (line 276) points to your org’s Anypoint Exchange Maven endpoint, so mvn deploy publishes there.
+
+        Important details:
+
+        The <id> in distributionManagement must match a <server><id>... in settings.xml (line 140) for auth.
+        mvn package builds only (no remote publish).
+        mvn install publishes only to local .m2.
+        mvn deploy publishes to the remote repo defined in distributionManagement.
+       -->
+
+    <!-- Username/password auth (anypoint-exchange-v3 server in settings.xml) used for publishing -->
+    <distributionManagement>
+        <repository>
+            <id>anypoint-exchange-v3</id>
+            <name>Anypoint Exchange — Org Repository</name>
+            <url>https://maven.anypoint.mulesoft.com/api/v3/organizations/19f95d7d-3947-427e-bb08-a9810ebfd7e0/maven</url>
+            <layout>default</layout>
+        </repository>
+    </distributionManagement>
+
+</project>

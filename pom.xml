@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<!--
+	╔════════════════════════════════════════════════════════════════════════════╗
+	║                     APPLICATION POM (Your Mule App)                        ║
+	╠════════════════════════════════════════════════════════════════════════════╣
+	║ THIS IS YOUR MAIN PROJECT FILE - Most important file to understand!      ║
+	║                                                                            ║
+	║ PROJECT STRUCTURE (Inheritance):                                          ║
+	║   master-bom.pom (defines versions)                                       ║
+	║        ↓                                                                   ║
+	║   parent-pom.pom (adds build config & deployment settings)               ║
+	║        ↓                                                                   ║
+	║   pom.xml ← YOU ARE HERE (YOUR APP with dependencies & config)           ║
+	║                                                                            ║
+	║ WHAT'S IN THIS FILE:                                                      ║
+	║   <groupId> = Your organization (team/company UUID)                      ║
+	║   <artifactId> = This app's name (mule-template-app)                    ║
+	║   <version> = This app's version (1.0.4)                                ║
+	║   <dependencies> = Libraries your app needs (HTTP, databases, etc)      ║
+	║                                                                            ║
+	║ BUILD COMMANDS:                                                           ║
+	║   mvn clean package -s settings.xml                                       ║
+	║     → Compiles your code and creates mule-template-app-1.0.4.jar       ║
+	║                                                                            ║
+	║   mvn clean test -s settings.xml                                          ║
+	║     → Runs all MUnit tests to verify your flows work correctly           ║
+	║                                                                            ║
+	║ DEPLOY TO CLOUDHUB (Two-step process):                                   ║
+	║   mvn clean deploy -P sandbox -s settings.xml                             ║
+	║     Step 1: Publishes JAR to Anypoint Exchange                           ║
+	║     Step 2: Deploys app to CloudHub Sandbox environment                  ║
+	║                                                                            ║
+	║   mvn clean deploy -P production -s settings.xml                          ║
+	║     Same as above but deploys to Production environment                  ║
+	║                                                                            ║
+	║ UPGRADE THE VERSION:                                                      ║
+	║   mvn versions:set -DnewVersion=1.0.5 -DgenerateBackupPoms=false        ║
+	║   Then: mvn clean deploy -P sandbox -s settings.xml                       ║
+	║                                                                            ║
+	║ WHY settings.xml? (Where credentials are stored)                         ║
+	║   • Contains usernames/passwords for Anypoint Platform                   ║
+	║   • NEVER commit this file to Git (add to .gitignore)                   ║
+	║   • Each developer has their own copy locally                            ║
+	╚════════════════════════════════════════════════════════════════════════════╝
+	-->
+	<parent>
+		<groupId>19f95d7d-3947-427e-bb08-a9810ebfd7e0</groupId>
+		<artifactId>parent-pom</artifactId>
+		<version>2.0.0</version>
+		<relativePath>parent-pom/pom.xml</relativePath>
+	</parent>
+	<groupId>19f95d7d-3947-427e-bb08-a9810ebfd7e0</groupId>
+	<artifactId>mule-template-app</artifactId>
+	<version>1.1.5</version>
+	<packaging>mule-application</packaging>
+	<name>mule-template-project</name>
+	<properties>
+		<!--
+		═══════════════════════════════════════════════════════════════════════════
+		CLOUDHUB APP NAMING
+		═══════════════════════════════════════════════════════════════════════════
+		The app.name is what appears in CloudHub Runtime Manager. It's composed of:
+
+		TEMPLATE: ${env.prefix}-${project.artifactId}-${app.version}
+
+		BREAKDOWN:
+		  ${env.prefix} = Environment prefix (sbx=Sandbox, prd=Production)
+		  ${project.artifactId} = Your app name (mule-template-app)
+		  ${app.version} = Version label (v1)
+
+		EXAMPLES:
+		  Sandbox: sbx-mule-template-app-v1
+		  Production: prd-mule-template-app-v1
+
+		CLOUDHUB CONSTRAINTS:
+		  • Min 3 characters, Max 42 characters
+		  • Only lowercase letters, numbers, and hyphens
+		  • Underscores and uppercase NOT allowed!
+
+		WHY NOT USE PROJECT VERSION?
+		  Project version changes frequently (1.0.0 → 1.0.1 → 1.0.2)
+		  But the CloudHub app name should be STABLE
+		  So we use app.version (v1) which changes less often
+		  This way: sbx-mule-template-app-v1 stays the same, receives updates
+		═══════════════════════════════════════════════════════════════════════════
+		-->
+		<app.version>v1</app.version>
+		<!-- DEPLOYED APP NAME IN CLOUDHUB (do not change this format!) -->
+		<app.name>${env.prefix}-${project.artifactId}-${app.version}</app.name>
+		<project.runtime.version>4.5.0</project.runtime.version>
+		<car.plugin.version>5.4.13</car.plugin.version>
+		<dockerfile.base.image>wso2/wso2mi:${project.runtime.version}</dockerfile.base.image>
+	</properties>
+	<build>
+		<!--
+		═══════════════════════════════════════════════════════════════════════════
+		FINAL JAR FILENAME
+		═══════════════════════════════════════════════════════════════════════════
+		When you run "mvn clean package", this determines what the output JAR is named.
+
+		FORMULA: ${project.artifactId}-${project.version}
+
+		EXAMPLE:
+		  If version is 1.0.4:
+		    Output JAR: mule-template-app-1.0.4-mule-application.jar
+		                └──────────────────┬──────────────────┘
+		                   This part comes from finalName
+		                   (the -mule-application suffix is added by the plugin)
+
+		  If you bump version to 1.0.5:
+		    Output JAR: mule-template-app-1.0.5-mule-application.jar
+
+		WHY IMPORTANT:
+		  • Easy to identify which version you're looking at
+		  • When deployed to Exchange, version is in the filename
+		  • Helps with tracking and debugging
+		═══════════════════════════════════════════════════════════════════════════
+		-->
+		<finalName>${project.artifactId}-${project.version}</finalName>
+		<plugins>
+			<!--
+				mule-maven-plugin — extensions=true activates the mule-application lifecycle.
+				All deployment configuration (cloudhub2Deployment block) is inherited
+				from parent-pom's pluginManagement. Do NOT add a <configuration> block
+				here unless you need to override a specific parent setting.
+			-->
+			<plugin>
+				<groupId>org.mule.tools.maven</groupId>
+				<artifactId>mule-maven-plugin</artifactId>
+				<extensions>true</extensions>
+				<configuration>
+					<classifier>mule-application</classifier>
+				</configuration>
+				<version>4.7.0</version>
+			</plugin>
+		</plugins>
+	</build>
+	<dependencies>
+		<!--
+			Dependency versions are managed by master-bom's dependencyManagement.
+			Do not specify <version> here — it will be ignored and creates drift.
+		-->
+		<dependency>
+			<groupId>org.mule.connectors</groupId>
+			<artifactId>mule-http-connector</artifactId>
+			<classifier>mule-plugin</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.connectors</groupId>
+			<artifactId>mule-sockets-connector</artifactId>
+			<classifier>mule-plugin</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.modules</groupId>
+			<artifactId>mule-apikit-module</artifactId>
+			<classifier>mule-plugin</classifier>
+		</dependency>
+		<dependency>
+			<groupId>com.mulesoft.modules</groupId>
+			<artifactId>mule-secure-configuration-property-module</artifactId>
+			<version>1.3.0</version>
+			<classifier>mule-plugin</classifier>
+		</dependency>
+		<dependency>
+			<groupId>19f95d7d-3947-427e-bb08-a9810ebfd7e0</groupId>
+			<artifactId>mule-template-api</artifactId>
+			<version>1.0.0</version>
+			<classifier>raml</classifier>
+			<type>zip</type>
+		</dependency>
+	</dependencies>
+	<!--
+		Required so Maven can resolve assets hosted in Anypoint Exchange
+		(for example the organization's mule-template-api RAML artifact).
+		The repository id must match settings.xml server id "anypoint-exchange-v3"
+		so Maven can apply credentials when downloading.
+	-->
+
+	<!-- anypoint-exchange-v3 is already declared in master-bom/pom.xml, 
+	and that repository is inherited via parent-pom into your app POM. So the root declaration is redundant.
+	Keep it only if you want extra local clarity/self-documentation; 
+	technically you can remove it as long as the parent chain remains the same. -->
+
+	<!--  <repositories>
+		<repository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange V3</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+			<layout>default</layout>
+		</repository>
+	</repositories> -->
+
+	<!-- repositories = where Maven downloads dependencies from  -->
+	<!-- <repositories> 
+		<repository>
+			<id>azure-token</id>
+			<url>https://pkgs.dev.azure.com/k2slionel/_packaging/k2slionel/maven/v1</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange V3</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+			<layout>default</layout>
+		</repository>
+	</repositories> -->
+
+	<!--  distributionManagement = where Maven uploads your built artifact (jar, pom) on mvn deploy 
+	mvn package builds only (no remote publish).
+	mvn install publishes only to local .m2.
+	mvn deploy publishes to the remote repo defined in distributionManagement.
+	-->
+	<!-- <distributionManagement>
+		<repository>
+			<id>azure-token</id>
+			<url>https://pkgs.dev.azure.com/k2slionel/_packaging/k2slionel/maven/v1</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</distributionManagement> -->
+	<repositories>
+		<repository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange V3</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+			<layout>default</layout>
+		</repository>
+	</repositories>
+</project>

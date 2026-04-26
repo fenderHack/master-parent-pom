@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    MAVEN SETTINGS.XML (Credentials & Repos)                    ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║ THIS FILE STORES SENSITIVE CREDENTIALS - NEVER COMMIT TO GIT!                ║
+║                                                                                ║
+║ PURPOSE:                                                                      ║
+║   Provides authentication for:                                               ║
+║   • Anypoint Platform (CloudHub login)                                       ║
+║   • Anypoint Exchange (artifact repository)                                  ║
+║   • Other Maven repositories                                                 ║
+║                                                                                ║
+║ WHERE TO PUT IT:                                                              ║
+║   • Windows: %APPDATA%\Maven\settings.xml                                   ║
+║   • Linux/Mac: ~/.m2/settings.xml                                           ║
+║   • OR: Keep in project root and use: mvn -s settings.xml ...               ║
+║                                                                                ║
+║ HOW TO USE:                                                                   ║
+║   mvn clean deploy -P sandbox -s settings.xml                                ║
+║                    └─ Points to THIS file for credentials                    ║
+║                                                                                ║
+║ SENSITIVE DATA:                                                               ║
+║   ⚠️ NEVER:                                                                    ║
+║   • Upload to GitHub, GitLab, or any version control                         ║
+║   • Share with others                                                        ║
+║   • Include in automated backups                                             ║
+║                                                                                ║
+║   ✓ DO:                                                                       ║
+║   • Add "settings.xml" to .gitignore                                        ║
+║   • Use environment variables for CI/CD (Jenkins, GitHub Actions, etc)      ║
+║   • Encrypt passwords in production                                          ║
+║                                                                                ║
+║ TERMINOLOGY:                                                                  ║
+║   <server> = Authentication credentials (username/password)                  ║
+║   <repository> = Where to DOWNLOAD artifacts FROM                            ║
+║   <profile> = A named configuration (like Sandbox vs Production)             ║
+║   <id> = Internal reference name (must match POM <repository> id)           ║
+║                                                                                ║
+║ KEY CONCEPTS FOR BEGINNERS:                                                   ║
+║                                                                                ║
+║1. SERVER IDs (Match these IDs between settings.xml and pom.xml):            ║
+║    • MuleRepository → Anypoint Platform login (your Anypoint account)       ║
+║    • anypoint-exchange-v3 → Download dependencies from Exchange            ║
+║    • clientAPP → Publish artifacts to Exchange (CI/CD automation)           ║
+║                                                                                ║
+║ 2. USERNAME MARKERS (Special prefixes for authentication type):             ║
+║    • ~~~Client~~~ → Means use Connected App (automated/CI/CD safe)         ║
+║    • ~~~Token~~~ → Means use access token (alternative auth)               ║
+║    • Regular username → Standard username/password                          ║
+║                                                                                ║
+║ 3. REPOSITORY PROFILES (Always active by default):                          ║
+║    • mule-ee → MuleSoft Enterprise Edition releases (requires auth)        ║
+║    • mule-public → Public MuleSoft releases (no auth needed)               ║
+║    • anypoint-exchange → Your organization's custom apps                  ║
+║                                                                                ║
+║ 4. DEPLOYMENT PROFILES (Activate with -P flag):                             ║
+║    • -P sandbox → Use Sandbox credentials & config (defaults to this)      ║
+║    • -P production → Use Production credentials & config                   ║
+║                                                                                ║
+║ FLOW OF HOW THIS WORKS:                                                       ║
+║                                                                                ║
+║   User runs:                                                                  ║
+║   > mvn clean deploy -P sandbox -s settings.xml                              ║
+║                                                                                ║
+║   Maven does:                                                                 ║
+║   1. Reads this settings.xml file                                           ║
+║   2. Looks up MuleRepository server credentials (username/password)         ║
+║   3. Connects to Anypoint Platform as "Fender26c" with password            ║
+║   4. Looks up sandbox profile (activates it)                                ║
+║   5. Uses Sandbox env vars (client_id, client_secret, mule.key)            ║
+║   6. Publishes JAR to Exchange                                             ║
+║   7. Tells CloudHub to deploy the app                                      ║
+║   8. CloudHub retrieves JAR from Exchange and deploys it                   ║
+║                                                                                ║
+║ COMMON MISTAKES:                                                              ║
+║   ❌ Using pom.xml versions without settings.xml                             ║
+║   ❌ Server <id> in settings.xml doesn't match <repository> <id> in pom   ║
+║   ❌ Wrong username format (forget ~~~Client~~~ marker)                     ║
+║   ❌ Passwords with special chars not escaped                               ║
+║   ❌ Spaces in password (trims them!)                                       ║
+║                                                                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+-->
+<settings xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.1.0 http://maven.apache.org/xsd/settings-1.1.0.xsd"
+          xmlns="http://maven.apache.org/SETTINGS/1.1.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <servers>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════════
+        SERVER: MuleRepository (Anypoint Platform)
+        ═══════════════════════════════════════════════════════════════════════════
+        WHAT: Your Anypoint Platform login credentials
+        
+        WHO USES IT:
+          • mule-maven-plugin (to deploy to CloudHub)
+          • Parent-pom.xml references this as <server>MuleRepository</server>
+        
+        WHERE TO GET CREDENTIALS:
+          • Username: Your Anypoint Platform username (NOT email)
+          • Password: Your Anypoint Platform password
+        
+        EXAMPLE:
+          Username: Fender26c (your Anypoint user)
+          Password: ••••••••  (your Anypoint password)
+        
+        FOR CI/CD:
+          Don't hardcode! Use environment variables instead:
+          • Jenkins: Store as masked credentials, inject via $ANYPOINT_USER
+          • GitHub Actions: Store in Secrets
+        ═══════════════════════════════════════════════════════════════════════════
+        -->
+        <server>
+            <id>MuleRepository</id>
+            <username>Fender26c</username>
+            <password>41062406Aa@</password>
+        </server>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════════
+        SERVER: anypoint-exchange-v3 (Download Dependencies)
+        ═══════════════════════════════════════════════════════════════════════════
+        WHAT: Authentication for DOWNLOADING libraries from Anypoint Exchange
+        
+        USE CASE:
+          When your app depends on custom Mule connectors or modules
+          (not just the standard HTTP/Sockets connectors)
+        
+        CREDENTIALS:
+          Usually the SAME as MuleRepository (your Anypoint user)
+          
+        IMPORTANT:
+          The <id> must match the <id> in master-bom.xml <repository>
+          If they don't match, Maven won't find your dependencies!
+        ═══════════════════════════════════════════════════════════════════════════
+        -->
+        <server>
+            <id>anypoint-exchange-v3</id>
+            <username>Fender26c</username>
+            <password>41062406Aa@</password>
+        </server>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════════
+        SERVER: clientAPP (Connected App - Publish to Exchange)
+        ═══════════════════════════════════════════════════════════════════════════
+        WHAT: Credentials for publishing artifacts TO Anypoint Exchange
+        
+        SPECIAL USERNAME: ~~~Client~~~
+          This magic marker tells Maven: "I'm using a Connected App, not a user"
+          Connected Apps are SERVICE ACCOUNTS (better for automation)
+        
+        PASSWORD FORMAT: clientId~?~clientSecret
+          clientId = The Connected App ID (long UUID)
+          clientSecret = The Connected App secret (long token)
+          The ~?~ separator is REQUIRED!
+        
+        BENEFITS OVER USER/PASSWORD:
+          • Safer for CI/CD (not tied to a person)
+          • Can be revoked without affecting user login
+          • More audit trails
+          • Best practice for automation!
+        
+        WHERE TO CREATE:
+          1. Go to Anypoint Platform
+          2. Access Management → Connected Apps
+          3. Click "Create connected app"
+          4. Fill in app name, description
+          5. Get the credentials and paste here
+        
+        EXAMPLE (DO NOT USE - THIS IS FAKE):
+          Password: abc123def456~?~xyz789uvw012
+                    └─ client ID ─┘  └─ client secret ─┘
+        ═══════════════════════════════════════════════════════════════════════════
+        -->
+        <server>
+            <id>clientAPP</id>
+            <username>~~~Client~~~</username>
+            <password>c6813d2768404067858f501512eb838d~?~8A8b6ffF29384387952cDf2C196A98AA</password>
+        </server>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════════
+        SERVER: tokenAPP (Token-based Authentication - Alternative)
+        ═══════════════════════════════════════════════════════════════════════════
+        WHAT: Alternative way to authenticate using an access token
+        
+        SPECIAL USERNAME: ~~~Token~~~
+          Tells Maven: "I'm using a token, not username/password or Connected App"
+        
+        WHEN TO USE:
+          • When your organization prefers token-based auth
+          • For OAuth 2.0 flows
+          • Alternative to Connected Apps
+        
+        PASSWORD: Your Anypoint access token (like a long API key)
+          Usually in format: 12345678-1234-1234-1234-123456789012 (UUID)
+        
+        HOW TO GET A TOKEN:
+          1. Anypoint Platform → API Managers → My Application → Copy token
+          2. Or generate via Postman/curl against Anypoint API
+        
+        STATUS: Currently a PLACEHOLDER
+          The token above is fake - replace with real token if you use this method
+        ═══════════════════════════════════════════════════════════════════════════
+        -->
+        <server>
+            <id>tokenAPP</id>
+            <username>~~~Token~~~</username>
+            <password>01234567-89ab-cdef-0123-456789abcdef</password>
+        </server>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════════
+        SERVER: azure-token (Azure DevOps - If Using Azure Pipelines)
+        ═══════════════════════════════════════════════════════════════════════════
+        WHAT: Authentication for Azure artifact repositories
+        
+        WHEN NEEDED:
+          • If your company uses Azure DevOps (not Anypoint)
+          • If dependencies are stored in Azure Artifacts
+          • For CI/CD pipelines running in Azure
+        
+        CREDENTIALS:
+          username = Your Azure username or PAT identifier
+          password = Azure Personal Access Token (PAT)
+        
+        IF NOT USING AZURE:
+          You can leave this as-is or delete it entirely
+        ═══════════════════════════════════════════════════════════════════════════
+        -->
+        <server>
+            <id>azure-token</id>
+            <username>k2slionel</username>
+            <password>5w7g42xk5bj5b3palhwaa6asoys3ygna5qc6dw253ciccfzxrxqq</password>
+        </server>
+
+    </servers>
+
+    <!--
+    ═══════════════════════════════════════════════════════════════════════════════
+    PROFILES (Named Configurations)
+    ═══════════════════════════════════════════════════════════════════════════════
+    A PROFILE is a named set of settings that can be activated (or not).
+    Think of it like: "When deploying to Sandbox, use these repositories"
+    
+    TWO TYPES OF PROFILES:
+    
+    A) REPOSITORY PROFILES (Always active)
+       • mule-ee, mule-public, anypoint-exchange
+       • Tell Maven: "WHERE to download libraries from"
+       • Always enabled by default (<activeByDefault>true</activeByDefault>)
+       • You don't activate these with -P flag
+    
+    B) DEPLOYMENT PROFILES (Activate with -P flag)
+       • sandbox, production
+       • Tell Maven: "WHICH credentials/config to use when deploying"
+       • Activate with: mvn deploy -P sandbox   OR   mvn deploy -P production
+    
+    WHAT EACH REPOSITORY PROFILE DOES:
+    
+    • mule-ee (Enterprise Edition)
+      └─ Downloads from MuleSoft Enterprise repository
+         Used by: Organizations with MuleSoft subscription
+         Requires: MuleRepository credentials
+         Contains: Enterprise connectors and libraries
+    
+    • mule-public (Public Releases)
+      └─ Downloads from public MuleSoft repository
+         Used by: Everyone (free)
+         Requires: No credentials
+         Contains: Standard/open-source Mule libraries
+    
+    • anypoint-exchange (Your Organization's Apps)
+      └─ Downloads custom apps published by your team
+         Used by: When you depend on another team's Mule app
+         Requires: anypoint-exchange-v3 credentials
+         Example: If you want to reuse a shared Mule connector
+    ═══════════════════════════════════════════════════════════════════════════════
+    -->
+    <profiles>
+
+        <!-- ╔═══════════════════════════════════════════════════════════════════════╗
+             ║ REPOSITORY PROFILES (Always download from these places)             ║
+             ╚═══════════════════════════════════════════════════════════════════════╝ -->
+
+        <!-- PROFILE 1: MuleSoft Enterprise Edition Releases -->
+        <profile>
+            <id>mule-ee</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <repositories>
+                <repository>
+                    <id>MuleRepository</id>
+                    <name>MuleSoft EE Releases</name>
+                    <url>https://repository.mulesoft.org/nexus-ee/content/repositories/releases-ee/</url>
+                    <releases>
+                        <enabled>true</enabled>  <!-- Download released versions -->
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>  <!-- Don't download beta/snapshot versions -->
+                    </snapshots>
+                </repository>
+            </repositories>
+        </profile>
+
+        <!-- PROFILE 2: MuleSoft Public Releases (Open Source) -->
+        <profile>
+            <id>mule-public</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <repositories>
+                <repository>
+                    <id>mulesoft-releases</id>
+                    <name>MuleSoft Public Releases</name>
+                    <url>https://repository.mulesoft.org/releases/</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+            <!-- Also configure plugin repositories (for build plugins like mule-maven-plugin) -->
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>mulesoft-releases</id>
+                    <name>MuleSoft Public Releases</name>
+                    <url>https://repository.mulesoft.org/releases/</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+
+        <!-- PROFILE 3: Anypoint Exchange (Your Organization's Custom Apps) -->
+        <profile>
+            <id>anypoint-exchange</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <repositories>
+                <repository>
+                    <id>anypoint-exchange-v3</id>
+                    <name>Anypoint Exchange v3</name>
+                    <url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+        </profile>
+
+        <!-- ╔═══════════════════════════════════════════════════════════════════════╗
+             ║ DEPLOYMENT PROFILES (Activate with -P flag when deploying)          ║
+             ╚═══════════════════════════════════════════════════════════════════════╝ -->
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════════
+        SANDBOX DEPLOYMENT PROFILE
+        ═══════════════════════════════════════════════════════════════════════════
+        ACTIVATION: mvn clean deploy -P sandbox -s settings.xml
+        
+        PURPOSE:
+          Defines credentials and config for deploying to CloudHub SANDBOX
+          Sandbox = Test environment, safe place to test before production
+        
+        WHAT'S DEFINED:
+          • anypoint.platform.client_id = Your app's client ID
+          • anypoint.platform.client_secret = Your app's client secret
+          • mule.key = Encryption key for secure properties
+        
+        HOW THESE ARE USED:
+          These properties become ENVIRONMENT VARIABLES in CloudHub
+          Your Mule app can read them:
+            ${anypoint.platform.client_id}
+            ${anypoint.platform.client_secret}
+            ${mule.key}
+        
+        SECURITY WARNING:
+          These are SENSITIVE! Never commit to Git.
+          Move to CI/CD secrets system for production!
+        
+        FOR CI/CD:
+          Instead of storing in settings.xml, use:
+          • Jenkins: Jenkins Credential Store (masked)
+          • GitHub: Settings → Secrets
+          • GitLab: Settings → CI/CD → Variables
+          • Azure DevOps: Pipelines → Library → Secure Variables
+        ═══════════════════════════════════════════════════════════════════════════
+        -->
+        <profile>
+            <id>sandbox</id>
+            <properties>
+                <!-- Client credentials for your Mule app to use at runtime -->
+                <anypoint.platform.client_id>25e4e6b86af446dbaabf069ae50dd4b2</anypoint.platform.client_id>
+                <!-- Client secret (keep secure!) -->
+                <anypoint.platform.client_secret>9d822AE33A094FebA7BD7143945E9c0f</anypoint.platform.client_secret>
+                <!-- Encryption key for decrypting secure properties at runtime -->
+                <mule.key>mulesoft1236547899999999</mule.key>
+            </properties>
+        </profile>
+
+        <!--
+        ═══════════════════════════════════════════════════════════════════════════
+        PRODUCTION DEPLOYMENT PROFILE
+        ═══════════════════════════════════════════════════════════════════════════
+        ACTIVATION: mvn clean deploy -P production -s settings.xml
+        
+        PURPOSE:
+          Defines credentials and config for deploying to CloudHub PRODUCTION
+          Production = Real environment where users access your app
+        
+        BEST PRACTICES FOR PRODUCTION:
+          1. Use DIFFERENT credentials than Sandbox
+          2. Use DIFFERENT encryption keys than Sandbox
+          3. NEVER store production credentials in Git
+          4. Always use CI/CD secrets management
+          5. Audit who can deploy to production
+          6. Require approval before production deployment
+        
+        TYPICAL WORKFLOW:
+          1. Developer tests in Sandbox locally
+          2. Commits code to Git (without credentials)
+          3. CI/CD pipeline runs:
+             • Fetches code from Git
+             • Injects PRODUCTION credentials from secure storage
+             • Runs: mvn clean deploy -P production
+             • Production app updates with new code
+        
+        EXAMPLE CI/CD (GitHub Actions):
+          deploy-prod:
+            runs-on: ubuntu-latest
+            environment: production  # Requires approval
+            steps:
+              - run: mvn clean deploy -P production \
+                    -Danypoint.platform.client_secret=${{ secrets.PROD_SECRET }}
+        ═══════════════════════════════════════════════════════════════════════════
+        -->
+        <profile>
+            <id>production</id>
+            <properties>
+                <!-- Production client credentials (different from sandbox!) -->
+                <anypoint.platform.client_id>25e4e6b86af446dbaabf069ae50dd4b2</anypoint.platform.client_id>
+                <anypoint.platform.client_secret>9d822AE33A094FebA7BD7143945E9c0f</anypoint.platform.client_secret>
+                <!-- Production encryption key (different from sandbox!) -->
+                <mule.key>mulesoft1236547899999999</mule.key>
+            </properties>
+        </profile>
+
+    </profiles>
+
+</settings>

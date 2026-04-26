@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>19f95d7d-3947-427e-bb08-a9810ebfd7e0</groupId>
+		<artifactId>master-bom</artifactId>
+		<version>2.0.0</version>
+		<relativePath>../master-bom/pom.xml</relativePath>
+	</parent>
+
+	<groupId>19f95d7d-3947-427e-bb08-a9810ebfd7e0</groupId>
+	<artifactId>parent-pom</artifactId>
+	<version>2.0.0</version>
+	<packaging>pom</packaging>
+	<name>parent-pom</name>
+
+	<description>Parent POM pour les APIs Mule</description>
+
+	<!-- PARENT POM — Build configuration and CloudHub 2.0 deployment settings. 
+		Children inherit the full cloudhub2Deployment block via pluginManagement. 
+		They only need to declare the mule-maven-plugin with <extensions>true</extensions>. 
+		Deploy commands: Sandbox : mvn clean deploy -P sandbox -s settings.xml Production: 
+		mvn clean deploy -P production -s settings.xml To deploy without publishing 
+		to Exchange: mvn clean package mule:deploy -P sandbox -s settings.xml -->
+
+	<!--
+	╔════════════════════════════════════════════════════════════════════════════╗
+	║                      PARENT POM (Shared Config)                           ║
+	╠════════════════════════════════════════════════════════════════════════════╣
+	║ PURPOSE:                                                                   ║
+	║   Defines SHARED build and deployment configuration for ALL apps         ║
+	║   that inherit from this POM.                                            ║
+	║                                                                            ║
+	║ INHERITANCE CHAIN:                                                        ║
+	║   master-bom (version numbers)                                           ║
+	║        ↓                                                                   ║
+	║   parent-pom ← YOU ARE HERE (build config + deployment settings)         ║
+	║        ↓                                                                   ║
+	║   pom.xml (your actual app)                                              ║
+	║                                                                            ║
+	║ WHAT'S IN HERE:                                                           ║
+	║   • <properties> = Global settings (URLs, versions, names)               ║
+	║   • <profiles> = Environment configs (Sandbox vs Production)             ║
+	║   • <pluginManagement> = How plugins behave (shared config)             ║
+	║   • <build> = Build rules (resource filtering, plugin settings)         ║
+	║   • <repositories> = Where to download libraries from                    ║
+	║                                                                            ║
+	║ BENEFITS:                                                                 ║
+	║   • ONE place to change build config for all apps                        ║
+	║   • Consistency across organization                                       ║
+	║   • Easier maintenance (update once, all apps benefit)                   ║
+	║                                                                            ║
+	║ EXAMPLE:                                                                  ║
+	║   If you want ALL apps to use Java 11 (instead of 8):                   ║
+	║   • Change parent-pom.xml compiler plugin                                ║
+	║   • Rebuild all child apps                                               ║
+	║   • All now use Java 11!                                                 ║
+	║                                                                            ║
+	║ DO NOT ADD:                                                               ║
+	║   ✗ <dependencies> (go in individual app pom.xml)                        ║
+	║   ✗ App-specific properties (go in individual pom.xml)                   ║
+	║   ✗ Custom plugins that only one app needs                              ║
+	╚════════════════════════════════════════════════════════════════════════════╝
+	-->
+
+	<properties>
+		<type>custom</type>
+		<!--
+		═══════════════════════════════════════════════════════════════════════════
+		ANYPOINT PLATFORM AUTHENTICATION
+		═══════════════════════════════════════════════════════════════════════════
+		This tells Maven WHICH authentication server to use for CloudHub deployment
+		
+		<anypoint.server> = The <id> in settings.xml that has your Anypoint creds
+		<anypoint.uri> = The Anypoint Platform URL (almost always this URL)
+		
+		FLOW:
+		1. Maven sees: <server>${anypoint.server}</server>
+		2. Looks up: <server><id>MuleRepository</id> in settings.xml
+		3. Gets: username/password from settings.xml
+		4. Uses those creds to login to Anypoint Platform
+		5. Deploys your app to CloudHub
+		═══════════════════════════════════════════════════════════════════════════
+		-->
+		<anypoint.server>MuleRepository</anypoint.server>
+		<anypoint.uri>https://anypoint.mulesoft.com</anypoint.uri>
+
+		<!--
+		═══════════════════════════════════════════════════════════════════════════
+		CLOUDHUB 2.0 TARGET SHARED SPACE
+		═══════════════════════════════════════════════════════════════════════════
+		This is the NAME of the CloudHub Shared Space where your apps will deploy
+		
+		WHAT IS A SHARED SPACE?
+		  • A container/project in CloudHub
+		  • Multiple apps run in one Shared Space
+		  • Think of it like a "folder" for organizing apps
+		  • You can create multiple Shared Spaces
+		
+		CURRENT TARGET: Cloudhub-US-East-2
+		  • This is just a name you chose
+		  • Must match the Shared Space name in your CloudHub account
+		  • If your org has different regions:
+		    - Cloudhub-US-East-2 (N. Virginia)
+		    - Cloudhub-EU-West-1 (Ireland)
+		    - Cloudhub-AP-Singapore (Asia-Pacific)
+		
+		TO CHANGE:
+		  Edit this value to match your CloudHub Shared Space name
+		  Example: cloudhub.target>My-Production-Space</cloudhub.target>
+		═══════════════════════════════════════════════════════════════════════════
+		-->
+		<cloudhub.target>Cloudhub-US-East-2</cloudhub.target>
+
+		<!--
+		═══════════════════════════════════════════════════════════════════════════
+		APPLICATION VERSION LABEL
+		═══════════════════════════════════════════════════════════════════════════
+		This is used to label the CloudHub app name (NOT the JAR version!)
+		
+		SCENARIO:
+		  Your JAR versions change frequently: 1.0.0 → 1.0.1 → 1.0.2 → ...
+		  But you want the CloudHub app name to stay STABLE: sbx-my-app-v1
+		
+		SOLUTION:
+		  Use app.version for CloudHub naming, project.version for JAR naming
+		
+		EXAMPLES:
+		  Sandbox app: sbx-mule-template-app-v1  (stays same)
+		    while JAR: mule-template-app-1.0.0.jar (changes)
+		                  then: mule-template-app-1.0.1.jar
+		                  then: mule-template-app-1.0.2.jar
+		
+		  When to change app.version:
+		    • Major changes (new features, breaking changes)
+		    • Deploy incompatibility (new connector required)
+		    • Rarely! Usually stays v1 for entire product lifecycle
+		═══════════════════════════════════════════════════════════════════════════
+		-->
+		<app.version>v1</app.version>
+
+		<!--
+		═══════════════════════════════════════════════════════════════════════════
+		ENCRYPTION KEY FOR SECURE PROPERTIES
+		═══════════════════════════════════════════════════════════════════════════
+		PLACEHOLDER VALUE - MUST BE OVERRIDDEN AT DEPLOY TIME!
+		
+		PURPOSE:
+		  Mule can encrypt sensitive properties (like passwords, API keys)
+		  in the config files. This key is used to DECRYPT them at runtime.
+		
+		EXAMPLE:
+		  Config file has: password: ![5d41402abc4b2a76b9719d911017c592]
+		                    ↑ This is encrypted
+		
+		  At runtime, Mule uses this key to decrypt it:
+		    password: "my-secret-password"
+		
+		SECURITY WARNING:
+		  • NEVER use REPLACE_WITH_SECRET in production!
+		  • NEVER store real keys in POM files!
+		  • Always inject via environment variables or CI/CD
+		
+		HOW TO USE:
+		  mvn clean deploy -P sandbox -Dsecure.key=my-real-key-here
+		
+		FOR CI/CD:
+		  Jenkins: mvn deploy -Dsecure.key=$MULE_ENCRYPTION_KEY
+		  GitHub:  mvn deploy -Dsecure.key=${{ secrets.MULE_KEY }}
+		═══════════════════════════════════════════════════════════════════════════
+		-->
+		<secure.key>REPLACE_WITH_SECRET</secure.key>
+
+		<!--
+		═══════════════════════════════════════════════════════════════════════════
+		CLOUDHUB 2.0 RUNTIME PROPERTIES (Environment Variables in CloudHub)
+		═══════════════════════════════════════════════════════════════════════════
+		When your app runs in CloudHub, these become ENVIRONMENT VARIABLES.
+		Your Mule flows can read them with:
+		  • ${anypoint.platform.client_id}
+		  • ${anypoint.platform.client_secret}
+		  • ${mule.key}
+		
+		THESE ARE PLACEHOLDERS!
+		  Values come from settings.xml <profile><properties>
+		  
+		OVERRIDE AT DEPLOY TIME:
+		  mvn deploy -P sandbox \
+		    -Danypoint.platform.client_id=$CLIENT_ID \
+		    -Danypoint.platform.client_secret=$CLIENT_SECRET \
+		    -Dmule.key=$ENCRYPTION_KEY
+		
+		FOR CI/CD (BEST PRACTICE):
+		  Never put real secrets in POM or settings.xml
+		  Always use CI/CD secret management:
+		    Jenkins → Jenkins Credentials
+		    GitHub → Settings → Secrets
+		    GitLab → CI/CD → Variables (masked)
+		    Azure → Pipeline → Library → Secure
+		
+		SECURITY GUIDELINES:
+		  1. Store secrets in CI/CD system, NOT in Git
+		  2. Rotate keys regularly
+		  3. Use different keys for Sandbox vs Production
+		  4. Audit who can access secrets
+		  5. Use least privilege (only needed permissions)
+		═══════════════════════════════════════════════════════════════════════════
+		-->
+	</properties>
+
+	<!-- Environment profiles control where and how the app is deployed. Activate 
+		with -P sandbox (default) or -P production. Override any property on the 
+		command line with -D<property>=<value>. -->
+	
+	<!--
+	╔════════════════════════════════════════════════════════════════════════════╗
+	║                  DEPLOYMENT PROFILES (Sandbox vs Production)              ║
+	╠════════════════════════════════════════════════════════════════════════════╣
+	║ CONCEPT:                                                                   ║
+	║   A "profile" is a named configuration set. Think of it like:             ║
+	║   "When deploying to SANDBOX, use these settings"                        ║
+	║   "When deploying to PRODUCTION, use those settings"                     ║
+	║                                                                            ║
+	║ ACTIVATION:                                                               ║
+	║   mvn deploy -P sandbox                                                   ║
+	║      └─ Activates the "sandbox" profile                                 ║
+	║                                                                            ║
+	║   mvn deploy -P production                                                ║
+	║      └─ Activates the "production" profile                              ║
+	║                                                                            ║
+	║ WHAT DIFFERS:                                                             ║
+	║   • env.prefix: "sbx" vs "prd" (affects CloudHub app name)              ║
+	║   • cloudhub.env: Sandbox vs Production                                 ║
+	║   • cloudhub.replicas: Number of running instances                      ║
+	║   • cloudhub.vcores: Size of each instance (0.1=micro, 0.5=medium)     ║
+	║   • env: Which config file to load (dev.yaml vs prod.yaml)             ║
+	║                                                                            ║
+	║ WHAT'S THE SAME:                                                          ║
+	║   • Base configuration (plugins, repos, auth method)                     ║
+	║   • Build process                                                         ║
+	║   • Mule Runtime version                                                  ║
+	║                                                                            ║
+	║ DEFAULT PROFILE:                                                          ║
+	║   The <profile><activation><activeByDefault>true</activeByDefault>      ║
+	║   makes "sandbox" the default if you run "mvn deploy" without -P flag  ║
+	║   (Sandbox is default to be safe - prevents accidental prod changes!)   ║
+	║                                                                            ║
+	║ SIZE DIFFERENCES:                                                         ║
+	║   Sandbox: 1 replica, 0.1 vCore (micro = cheap, just for testing)      ║
+	║   Production: 2 replicas, 0.2 vCores (small = reliable, pays money)    ║
+	║                                                                            ║
+	║   vCore sizes:                                                            ║
+	║   • 0.1 = Micro (testing only)                                          ║
+	║   • 0.2 = Small (low traffic)                                           ║
+	║   • 0.5 = Medium (normal traffic)                                       ║
+	║   • 1.0 = Large (high traffic)                                          ║
+	║                                                                            ║
+	║   Replicas = Number of app instances running in parallel                ║
+	║   • 1 = Only one app running (if it crashes, service down)             ║
+	║   • 2+ = Multiple instances (if one crashes, others keep working)      ║
+	║                                                                            ║
+	╚════════════════════════════════════════════════════════════════════════════╝
+	-->
+	<profiles>
+
+		<profile>
+			<id>sandbox</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>  <!-- DEFAULT if no -P flag used -->
+			</activation>
+			<properties>
+				<!-- 
+				═══════════════════════════════════════════════════════════════════════
+				SANDBOX CONFIGURATION (Test Environment)
+				═══════════════════════════════════════════════════════════════════════
+				Use this when developing and testing before production deployment
+				
+				env.prefix = "sbx" → CloudHub app will be named "sbx-mule-template-app-v1"
+				cloudhub.env = "Sandbox" → Visible in Runtime Manager
+				cloudhub.replicas = 1 → Only one instance (test environment)
+				cloudhub.vcores = 0.1 → Micro size (smallest, cheapest)
+				env = "dev" → Loads src/main/resources/properties/dev.yaml
+				
+				COST: Minimal (just for development testing)
+				RELIABILITY: Low (single instance, if it crashes app is down)
+				USE CASE: Testing, debugging, staging
+				═══════════════════════════════════════════════════════════════════════
+				-->
+				<env.prefix>sbx</env.prefix>
+				<cloudhub.env>Sandbox</cloudhub.env>
+				<cloudhub.replicas>1</cloudhub.replicas>
+				<cloudhub.vcores>0.1</cloudhub.vcores>
+				<!-- env selects which properties/{env}.yaml is loaded at runtime -->
+				<env>dev</env>
+				<!-- Sensitive properties (anypoint.platform.client_id, anypoint.platform.client_secret, 
+					 mule.key) are extracted to settings.xml and activated via -P sandbox -->
+			</properties>
+		</profile>
+
+		<profile>
+			<id>production</id>
+			<properties>
+				<!-- 
+				═══════════════════════════════════════════════════════════════════════
+				PRODUCTION CONFIGURATION (Real Environment)
+				═══════════════════════════════════════════════════════════════════════
+				Use ONLY after thorough testing in Sandbox environment!
+				
+				env.prefix = "prd" → CloudHub app will be named "prd-mule-template-app-v1"
+				cloudhub.env = "Production" → Visible in Runtime Manager
+				cloudhub.replicas = 2 → TWO instances running in parallel (high availability)
+				cloudhub.vcores = 0.2 → Small size (handles real traffic)
+				env = "prod" → Loads src/main/resources/properties/prod.yaml
+				
+				HIGH AVAILABILITY:
+				  • If instance 1 crashes, instance 2 keeps handling requests
+				  • Load balanced automatically by CloudHub
+				  • Slight delay as traffic reroutes, but zero downtime
+				
+				COST: Moderately higher (2 instances × size)
+				RELIABILITY: High (redundancy built-in)
+				USE CASE: Real users, business-critical operations
+				
+				DEPLOYMENT CHECKLIST BEFORE -P production:
+				  ✓ Code merged to main/master branch
+				  ✓ All tests passing
+				  ✓ Code review approved
+				  ✓ Tested in Sandbox environment
+				  ✓ Release notes documented
+				  ✓ Stakeholders notified
+				  ✓ Rollback plan ready (previous version)
+				═══════════════════════════════════════════════════════════════════════
+				-->
+				<env.prefix>prd</env.prefix>
+				<cloudhub.env>Production</cloudhub.env>
+				<cloudhub.replicas>2</cloudhub.replicas>
+				<cloudhub.vcores>0.2</cloudhub.vcores>
+				<!-- env selects which properties/{env}.yaml is loaded at runtime -->
+				<env>prod</env>
+				<!-- Sensitive properties (anypoint.platform.client_id, anypoint.platform.client_secret, 
+					 mule.key) are extracted to settings.xml and activated via -P production -->
+			</properties>
+		</profile>
+
+	</profiles>
+
+	<build>
+
+		 <!--  
+		 <pluginManagement> is Maven’s central defaults catalog for plugins.
+			It means:
+			Define plugin version + default config once (usually in parent POM).
+			Child modules don’t run plugins from pluginManagement automatically.
+			Child modules must still declare the plugin in <build><plugins> to activate it.
+			When they do, they inherit version/config from pluginManagement (unless overridden).
+			In your project:
+			Parent defines mule-maven-plugin defaults in parent-pom/pom.xml.
+			App POM activates it in pom.xml with <extensions>true</extensions>.
+		  -->
+
+		<pluginManagement>
+			<plugins>
+
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-clean-plugin</artifactId>
+				</plugin>
+
+
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-resources-plugin</artifactId>
+					<configuration>
+						<!-- Preserve special characters in property files (e.g. passwords 
+							with @) -->
+						<propertiesEncoding>ISO-8859-1</propertiesEncoding>
+					</configuration>
+				</plugin>
+
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<configuration>
+						<compilerArgs>
+							<arg>-parameters</arg>
+						</compilerArgs>
+					</configuration>
+				</plugin>
+
+				<!-- MULE MAVEN PLUGIN — CloudHub 2.0 deployment configuration. Children 
+					declare this plugin with <extensions>true</extensions> only; this managed 
+					config is merged in automatically by Maven. Authentication: the <server> 
+					element references settings.xml server "MuleRepository" (username: Fender26c, 
+					password: Anypoint password). CloudHub 2.0 key concepts vs CloudHub 1.0: 
+					- <cloudhub2Deployment> replaces <cloudhubDeployment> - <target> = Shared/Private 
+					Space name (not a region string) - <provider>MC</provider> = MuleSoft Shared 
+					Cloud (use RTFC for Runtime Fabric) - <replicas> replaces <workers> - <vCores> 
+					replaces <workerType> (0.1=Micro, 0.2=Small, 0.5=Medium, 1=Large) -->
+				<plugin>
+					<groupId>org.mule.tools.maven</groupId>
+					<artifactId>mule-maven-plugin</artifactId>
+					<version>${mule.maven.plugin.version}</version>
+					<extensions>true</extensions>
+					<configuration>
+						<cloudhub2Deployment>
+							<uri>${anypoint.uri}</uri>
+							<provider>MC</provider>
+							<environment>${cloudhub.env}</environment>
+							<target>${cloudhub.target}</target>
+							<muleVersion>${app.runtime}</muleVersion>
+							<!-- Resolves credentials from settings.xml server entry -->
+							<server>${anypoint.server}</server>
+							<applicationName>${app.name}</applicationName>
+							<replicas>${cloudhub.replicas}</replicas>
+							<vCores>${cloudhub.vcores}</vCores>
+
+							<deploymentSettings>
+								<!-- Let CloudHub generate the public *.cloudhub.io URL -->
+								<generateDefaultPublicUrl>true</generateDefaultPublicUrl>
+								<http>
+									<inbound>
+										<!-- lastMileSecurity: enables mTLS between the CloudHub LB and 
+											the Mule app. Set true only if you handle client certs. forwardSslSession: 
+											forwards TLS session attributes to the app. Both are false by default for 
+											standard public APIs. -->
+										<lastMileSecurity>false</lastMileSecurity>
+										<forwardSslSession>false</forwardSslSession>
+									</inbound>
+								</http>
+								<!-- Rolling update prevents downtime; use 'recreate' only for breaking 
+									changes -->
+								<updateStrategy>rolling</updateStrategy>
+								<!-- Enable clustering only for stateful apps with multiple replicas -->
+								<clustered>false</clustered>
+								<!-- Send Mule logs to Anypoint Monitoring (Unified Agent) -->
+								<disableAmLogForwarding>false</disableAmLogForwarding>
+								<!-- Object Store V2 persistent store (requires OSv2 entitlement) -->
+								<persistentObjectStore>false</persistentObjectStore>
+							</deploymentSettings>
+
+							<integrations>
+								<services>
+									<!-- Object Store V2 is always recommended over in-memory store -->
+									<objectStoreV2>
+										<enabled>true</enabled>
+									</objectStoreV2>
+								</services>
+							</integrations>
+
+							<!-- Runtime properties pushed to the CloudHub Properties tab. Visible 
+								(non-sensitive) values go in <properties>. Sensitive values go in <secureProperties> 
+								— they are masked in Runtime Manager and stored encrypted at rest. -->
+							<properties>
+								<anypoint.platform.client_id>${anypoint.platform.client_id}</anypoint.platform.client_id>
+								<env>${env}</env>
+							</properties>
+							<secureProperties>
+								<anypoint.platform.client_secret>${anypoint.platform.client_secret}</anypoint.platform.client_secret>
+								<mule.key>${mule.key}</mule.key>
+							</secureProperties>
+						</cloudhub2Deployment>
+					</configuration>
+				</plugin>
+
+				<!-- MUnit — inherited by all child applications -->
+				<plugin>
+					<groupId>com.mulesoft.munit.tools</groupId>
+					<artifactId>munit-maven-plugin</artifactId>
+					<version>${munit.version}</version>
+					<executions>
+						<execution>
+							<id>munit-test</id>
+							<phase>test</phase>
+							<goals>
+								<goal>test</goal>
+								<goal>coverage-report</goal>
+							</goals>
+						</execution>
+					</executions>
+					<configuration>
+						<environmentVariables>
+							<mule.env>munit</mule.env>
+						</environmentVariables>
+						<coverage>
+							<runCoverage>true</runCoverage>
+							<failBuild>false</failBuild>
+							<formats>
+								<format>html</format>
+							</formats>
+						</coverage>
+					</configuration>
+				</plugin>
+
+			</plugins>
+		</pluginManagement>
+
+		<resources>
+			<!-- Maven filtering on config files so ${property} placeholders are replaced 
+				at build time -->
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+				<includes>
+					<include>**/*.yaml</include>
+					<include>**/*.properties</include>
+					<include>**/log4j2.xml</include>
+				</includes>
+			</resource>
+			<!-- Copy all other resource files without filtering (avoids mangling 
+				binary files) -->
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>false</filtering>
+				<excludes>
+					<exclude>**/*.yaml</exclude>
+					<exclude>**/*.properties</exclude>
+					<exclude>**/log4j2.xml</exclude>
+				</excludes>
+			</resource>
+		</resources>
+	</build>
+
+</project>
