@@ -1,5 +1,8 @@
 name: Publish to Anypoint Exchange
 
+# Exchange v3 Maven facade retourne 412 pour les POM "custom" car il ne peut pas
+# déterminer le type d'asset. On utilise l'API REST Exchange v2 directement.
+
 on:
   push:
     branches: [ "master" ]
@@ -7,13 +10,10 @@ on:
       - "master-bom/pom.xml"
       - "parent-pom/pom.xml"
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Dry run — build only, no publish"
-        required: false
-        default: "false"
-        type: choice
-        options: [ "false", "true" ]
+
+env:
+  ORG_ID: "19f95d7d-3947-427e-bb08-a9810ebfd7e0"
+  ANYPOINT_URL: "https://anypoint.mulesoft.com"
 
 jobs:
   publish:
@@ -21,61 +21,82 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Java 8
         uses: actions/setup-java@v4
         with:
           java-version: "8"
           distribution: "temurin"
-          cache: maven
 
-      # Exchange v3 n'est pas compatible avec maven-deploy-plugin 3.x (erreur 412).
-      # On force la version 2.8.2 via propriété système en plus du pluginManagement.
-      - name: Deploy master-bom to Exchange
-        if: ${{ github.event.inputs.dry_run != 'true' }}
-        env:
-          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
-          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+      # ── 1. Authentification Anypoint Platform ───────────────────────────────
+      - name: Get Anypoint access token
+        id: auth
         run: |
-          mvn deploy \
-            -f master-bom/pom.xml \
-            -s settings-ci.xml \
-            -Dmaven.deploy.plugin.version=2.8.2 \
-            --no-transfer-progress
+          TOKEN=$(curl -sf -X POST \
+            "${ANYPOINT_URL}/accounts/login" \
+            -H "Content-Type: application/json" \
+            -d '{"username":"'"$ANYPOINT_USERNAME"'","password":"'"$ANYPOINT_PASSWORD"'"}' \
+            | jq -r '.access_token')
+          if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then
+            echo "Authentication failed"
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+        env:
+          ANYPOINT_USERNAME: ${{ secrets.ANYPOINT_USERNAME }}
+          ANYPOINT_PASSWORD: ${{ secrets.ANYPOINT_PASSWORD }}
 
-      - name: Install master-bom locally (dry run)
-        if: ${{ github.event.inputs.dry_run == 'true' }}
-        env:
-          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
-          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
-        run: |
-          mvn install \
-            -f master-bom/pom.xml \
-            -s settings-ci.xml \
-            --no-transfer-progress
+      # ── 2. master-bom en local .m2 (requis pour résoudre parent-pom) ────────
+      - name: Install master-bom to local .m2
+        run: mvn install -f master-bom/pom.xml -q --no-transfer-progress
 
-      # master-bom est dans le .m2 local après l'étape précédente.
-      - name: Deploy parent-pom to Exchange
-        if: ${{ github.event.inputs.dry_run != 'true' }}
-        env:
-          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
-          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+      # ── 3. Publier master-bom via Exchange REST API ─────────────────────────
+      - name: Publish master-bom
         run: |
-          mvn deploy \
-            -f parent-pom/pom.xml \
-            -s settings-ci.xml \
-            -Dmaven.deploy.plugin.version=2.8.2 \
-            --no-transfer-progress
+          VERSION=$(mvn help:evaluate -f master-bom/pom.xml \
+            -Dexpression=project.version -q -DforceStdout)
+          echo "→ master-bom v${VERSION}"
 
-      - name: Install parent-pom locally (dry run)
-        if: ${{ github.event.inputs.dry_run == 'true' }}
-        env:
-          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
-          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+          HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
+            "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -F "organizationId=${ORG_ID}" \
+            -F "groupId=${ORG_ID}" \
+            -F "assetId=master-bom" \
+            -F "version=${VERSION}" \
+            -F "name=Master BOM" \
+            -F "description=Master BOM - Gestion centralisée des versions MuleSoft" \
+            -F "type=custom" \
+            -F "files.pom=@master-bom/pom.xml;type=application/xml")
+
+          cat /tmp/resp.txt && echo ""
+          echo "HTTP ${HTTP_CODE}"
+          # 201 = créé, 409 = version déjà existante (non bloquant)
+          [[ "${HTTP_CODE}" == "201" || "${HTTP_CODE}" == "409" ]] || \
+            { echo "Echec publication master-bom"; exit 1; }
+
+      # ── 4. Publier parent-pom via Exchange REST API ─────────────────────────
+      - name: Publish parent-pom
         run: |
-          mvn install \
-            -f parent-pom/pom.xml \
-            -s settings-ci.xml \
-            --no-transfer-progress
+          VERSION=$(mvn help:evaluate -f parent-pom/pom.xml \
+            -Dexpression=project.version -q -DforceStdout)
+          echo "→ parent-pom v${VERSION}"
+
+          HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
+            "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -F "organizationId=${ORG_ID}" \
+            -F "groupId=${ORG_ID}" \
+            -F "assetId=parent-pom" \
+            -F "version=${VERSION}" \
+            -F "name=Parent POM" \
+            -F "description=Parent POM - Configuration build et déploiement CloudHub 2.0" \
+            -F "type=custom" \
+            -F "files.pom=@parent-pom/pom.xml;type=application/xml")
+
+          cat /tmp/resp.txt && echo ""
+          echo "HTTP ${HTTP_CODE}"
+          [[ "${HTTP_CODE}" == "201" || "${HTTP_CODE}" == "409" ]] || \
+            { echo "Echec publication parent-pom"; exit 1; }
