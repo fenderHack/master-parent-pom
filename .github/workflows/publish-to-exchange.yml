@@ -26,7 +26,6 @@ jobs:
           java-version: "8"
           distribution: "temurin"
 
-      # ── 1. Authentification ─────────────────────────────────────────────────
       - name: Get Anypoint access token
         id: auth
         run: |
@@ -45,44 +44,113 @@ jobs:
           ANYPOINT_USERNAME: ${{ secrets.ANYPOINT_USERNAME }}
           ANYPOINT_PASSWORD: ${{ secrets.ANYPOINT_PASSWORD }}
 
-      # ── 2. Installer master-bom en local (requis pour résoudre parent-pom) ──
       - name: Install master-bom to local .m2
         run: mvn install -f master-bom/pom.xml -q --no-transfer-progress
 
-      # ── 3. Publier master-bom ────────────────────────────────────────────────
-      # URL format: /organizations/{orgId}/assets/{groupId}/{assetId}/{version}
       - name: Publish master-bom
         run: |
           VERSION=$(mvn help:evaluate -f master-bom/pom.xml \
             -Dexpression=project.version -q -DforceStdout)
           echo "Publishing master-bom v${VERSION}"
 
-          # Exchange lit name/description/type directement depuis le POM — ne pas les redéclarer
-          HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
+          RESP_FILE=/tmp/master-bom-resp.txt
+          STATUS_FILE=/tmp/master-bom-status.txt
+          HTTP_CODE=$(curl -s -o "${RESP_FILE}" -w "%{http_code}" -X POST \
             "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/master-bom/${VERSION}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -F "files.pom.pom=@master-bom/pom.xml;type=application/xml;filename=pom.xml")
 
-          cat /tmp/resp.txt && echo ""
+          cat "${RESP_FILE}" && echo ""
           echo "HTTP ${HTTP_CODE}"
-          # 201 = créé, 409 = version déjà publiée (non bloquant)
+
+          if [[ "${HTTP_CODE}" == "202" ]]; then
+            STATUS_URL=$(jq -r '.publicationStatusLink // empty' "${RESP_FILE}")
+            if [[ -z "${STATUS_URL}" ]]; then
+              echo "master-bom accepted (202) but publicationStatusLink is missing"
+              exit 1
+            fi
+
+            echo "master-bom accepted; polling publication status..."
+            for ATTEMPT in {1..30}; do
+              STATUS_HTTP=$(curl -s -o "${STATUS_FILE}" -w "%{http_code}" \
+                -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+                "${STATUS_URL}")
+              STATUS_VALUE=$(jq -r '.status // .publicationStatus // .state // empty' "${STATUS_FILE}" | tr '[:upper:]' '[:lower:]')
+              echo "poll ${ATTEMPT}/30 => HTTP ${STATUS_HTTP}, status=${STATUS_VALUE:-unknown}"
+
+              if [[ "${STATUS_HTTP}" == "200" ]]; then
+                if [[ "${STATUS_VALUE}" =~ ^(published|completed|success|succeeded|done)$ ]]; then
+                  HTTP_CODE="201"
+                  echo "master-bom publication completed."
+                  break
+                fi
+
+                if [[ "${STATUS_VALUE}" =~ ^(failed|error|errored|rejected|canceled|cancelled)$ ]]; then
+                  echo "master-bom publication failed:"
+                  cat "${STATUS_FILE}"
+                  exit 1
+                fi
+              fi
+
+              sleep 10
+            done
+
+            [[ "${HTTP_CODE}" == "201" ]] || { echo "Timed out waiting for master-bom publication"; exit 1; }
+          fi
+
           [[ "${HTTP_CODE}" == "201" || "${HTTP_CODE}" == "409" ]] || \
             { echo "Echec publication master-bom (HTTP ${HTTP_CODE})"; exit 1; }
 
-      # ── 4. Publier parent-pom ────────────────────────────────────────────────
       - name: Publish parent-pom
         run: |
           VERSION=$(mvn help:evaluate -f parent-pom/pom.xml \
             -Dexpression=project.version -q -DforceStdout)
           echo "Publishing parent-pom v${VERSION}"
 
-          # Exchange lit name/description/type directement depuis le POM — ne pas les redéclarer
-          HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
+          RESP_FILE=/tmp/parent-pom-resp.txt
+          STATUS_FILE=/tmp/parent-pom-status.txt
+          HTTP_CODE=$(curl -s -o "${RESP_FILE}" -w "%{http_code}" -X POST \
             "${ANYPOINT_URL}/exchange/api/v2/organizations/${ORG_ID}/assets/${ORG_ID}/parent-pom/${VERSION}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -F "files.pom.pom=@parent-pom/pom.xml;type=application/xml;filename=pom.xml")
 
-          cat /tmp/resp.txt && echo ""
+          cat "${RESP_FILE}" && echo ""
           echo "HTTP ${HTTP_CODE}"
+
+          if [[ "${HTTP_CODE}" == "202" ]]; then
+            STATUS_URL=$(jq -r '.publicationStatusLink // empty' "${RESP_FILE}")
+            if [[ -z "${STATUS_URL}" ]]; then
+              echo "parent-pom accepted (202) but publicationStatusLink is missing"
+              exit 1
+            fi
+
+            echo "parent-pom accepted; polling publication status..."
+            for ATTEMPT in {1..30}; do
+              STATUS_HTTP=$(curl -s -o "${STATUS_FILE}" -w "%{http_code}" \
+                -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+                "${STATUS_URL}")
+              STATUS_VALUE=$(jq -r '.status // .publicationStatus // .state // empty' "${STATUS_FILE}" | tr '[:upper:]' '[:lower:]')
+              echo "poll ${ATTEMPT}/30 => HTTP ${STATUS_HTTP}, status=${STATUS_VALUE:-unknown}"
+
+              if [[ "${STATUS_HTTP}" == "200" ]]; then
+                if [[ "${STATUS_VALUE}" =~ ^(published|completed|success|succeeded|done)$ ]]; then
+                  HTTP_CODE="201"
+                  echo "parent-pom publication completed."
+                  break
+                fi
+
+                if [[ "${STATUS_VALUE}" =~ ^(failed|error|errored|rejected|canceled|cancelled)$ ]]; then
+                  echo "parent-pom publication failed:"
+                  cat "${STATUS_FILE}"
+                  exit 1
+                fi
+              fi
+
+              sleep 10
+            done
+
+            [[ "${HTTP_CODE}" == "201" ]] || { echo "Timed out waiting for parent-pom publication"; exit 1; }
+          fi
+
           [[ "${HTTP_CODE}" == "201" || "${HTTP_CODE}" == "409" ]] || \
             { echo "Echec publication parent-pom (HTTP ${HTTP_CODE})"; exit 1; }
