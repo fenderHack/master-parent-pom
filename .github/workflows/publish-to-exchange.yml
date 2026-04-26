@@ -1,6 +1,5 @@
 name: Publish to Anypoint Exchange
 
-# Triggers: push on master (version bump) or manual dispatch
 on:
   push:
     branches: [ "master" ]
@@ -10,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run (build only, no deploy)"
+        description: "Dry run — build only, no publish"
         required: false
         default: "false"
         type: choice
@@ -18,15 +17,13 @@ on:
 
 jobs:
   publish:
-    name: Publish BOM & Parent POM to Exchange
+    name: Publish BOM & Parent POM
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Checkout ────────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 2. Java 8 (required by mule-maven-plugin) ──────────────────────────
       - name: Set up Java 8
         uses: actions/setup-java@v4
         with:
@@ -34,19 +31,11 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # ── 3. Print versions for traceability ────────────────────────────────
-      - name: Show artifact versions
-        run: |
-          echo "master-bom  : $(mvn help:evaluate -f master-bom/pom.xml  -Dexpression=project.version -q -DforceStdout -s settings-ci.xml)"
-          echo "parent-pom  : $(mvn help:evaluate -f parent-pom/pom.xml   -Dexpression=project.version -q -DforceStdout -s settings-ci.xml)"
-        env:
-          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
-          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+      # ── master-bom doit être déployé EN PREMIER ─────────────────────────────
+      # mvn deploy inclut la phase install → master-bom sera dans le .m2 local
+      # pour que parent-pom puisse résoudre son parent sans dépendre d'Exchange.
 
-      # ── 4. Deploy master-bom ───────────────────────────────────────────────
-      # Must run before parent-pom so it is available in the local .m2 cache.
       - name: Deploy master-bom to Exchange
-        if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
           ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
@@ -54,23 +43,13 @@ jobs:
           mvn deploy \
             -f master-bom/pom.xml \
             -s settings-ci.xml \
+            ${{ github.event.inputs.dry_run == 'true' && '-DskipRemoteStaging' || '' }} \
             --no-transfer-progress
 
-      - name: Build master-bom (dry run)
-        if: ${{ github.event.inputs.dry_run == 'true' }}
-        env:
-          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
-          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
-        run: |
-          mvn install \
-            -f master-bom/pom.xml \
-            -s settings-ci.xml \
-            --no-transfer-progress
+      # ── parent-pom ──────────────────────────────────────────────────────────
+      # Résout master-bom depuis le .m2 local (installé à l'étape précédente).
 
-      # ── 5. Deploy parent-pom ───────────────────────────────────────────────
-      # master-bom is already in the local .m2 from the previous step.
       - name: Deploy parent-pom to Exchange
-        if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
           ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
@@ -78,15 +57,5 @@ jobs:
           mvn deploy \
             -f parent-pom/pom.xml \
             -s settings-ci.xml \
-            --no-transfer-progress
-
-      - name: Build parent-pom (dry run)
-        if: ${{ github.event.inputs.dry_run == 'true' }}
-        env:
-          ANYPOINT_CLIENT_ID:     ${{ secrets.ANYPOINT_CLIENT_ID }}
-          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
-        run: |
-          mvn install \
-            -f parent-pom/pom.xml \
-            -s settings-ci.xml \
+            ${{ github.event.inputs.dry_run == 'true' && '-DskipRemoteStaging' || '' }} \
             --no-transfer-progress
