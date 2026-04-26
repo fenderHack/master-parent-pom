@@ -2,6 +2,9 @@
 !.gitignore
 !.github
 
+# Maven settings contain credentials — use settings-ci.xml for CI
+settings.xml
+settings.local.xml
 
-.*
-!.gitignore
+# Maven build output
+target/
